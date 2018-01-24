@@ -1,40 +1,36 @@
 package com.enthusiast94.ioc;
 
 import java.lang.reflect.Constructor;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 
 @SuppressWarnings("unchecked")
-public class Container {
+public final class Container {
 
-    private final Map<String, Registration> typedRegistrations = new ConcurrentHashMap<>();
-    private final Map<String, Object> resolvedSingletonInstances = new ConcurrentHashMap<>();
+    private final Map<String, Registration> typedRegistrations = new HashMap<>();
+    private final Map<String, Object> resolvedSingletonInstances = new HashMap<>();
 
-    public <F, T extends F> void registerType(Class<F> from, Class<T> to) {
+    public synchronized  <F, T extends F> void registerType(Class<F> from, Class<T> to) {
         this.typedRegistrations.put(from.getName(), new Registration.TypeRegistration<>(from, to, false));
     }
 
-    public <F, T extends F> void registerSingletonType(Class<F> from, Class<T> to) {
+    public synchronized <F, T extends F> void registerSingletonType(Class<F> from, Class<T> to) {
         this.typedRegistrations.put(from.getName(), new Registration.TypeRegistration<>(from, to, true));
     }
 
-    public <F> void registerInstance(F instance) {
+    public synchronized <F> void registerInstance(F instance) {
         typedRegistrations.put(instance.getClass().getName(),
                 new Registration.TypedInstanceRegistration<>((Class<F>) instance.getClass(), instance));
     }
 
-    public <F> void registerInstance(F instance, String name) {
+    public synchronized <F> void registerInstance(F instance, String name) {
         typedRegistrations.put(name, new Registration.NamedInstanceRegistration<>((Class<F>) instance.getClass(), name, instance));
     }
 
-    public <T> T resolve(Class<T> typeToResolve) {
+    public synchronized <T> T resolve(Class<T> typeToResolve) {
         return resolve(typeToResolve.getName());
     }
 
-    public <T> T resolve(String nameToResolve) {
+    public synchronized <T> T resolve(String nameToResolve) {
         Registration registration = typedRegistrations.get(nameToResolve);
         if (registration == null) {
             throw new IocException("Failed to resolve " + nameToResolve);
@@ -50,22 +46,13 @@ public class Container {
                 }
 
                 if (instance == null) {
-                    Optional<Constructor> longestConstructor = Arrays.stream(typeRegistration.to.getDeclaredConstructors())
-                            .max(Comparator.comparingInt(Constructor::getParameterCount));
+                    Optional<Constructor> longestConstructor = getLongestConstructor(typeRegistration.to);
 
                     if (!longestConstructor.isPresent()) {
                         throw new IocException("No public constructors found for type: " + typeRegistration.to.getName());
                     }
 
-
-                    Class[] parameterTypes = longestConstructor.get().getParameterTypes();
-                    Object[] parameters = new Object[parameterTypes.length];
-                    for (int i = 0; i < parameterTypes.length; i++) {
-                        Class parameterType = parameterTypes[i];
-                        parameters[i] = resolve(parameterType);
-                    }
-
-                    instance = (T) longestConstructor.get().newInstance(parameters);
+                    instance = createInstance(longestConstructor.get());
                 }
 
                 if (typeRegistration.isSingleton) {
@@ -83,6 +70,24 @@ public class Container {
         } else {
             throw new IocException("Cannot handle registrations of type: " + registration.getClass().getName());
         }
+    }
+
+    private Optional<Constructor> getLongestConstructor(Class type) {
+        return Arrays.stream(type.getDeclaredConstructors())
+                .max(Comparator.comparingInt(Constructor::getParameterCount));
+    }
+
+    private <T> T createInstance(Constructor longestConstructor) throws InstantiationException, IllegalAccessException, java.lang.reflect.InvocationTargetException {
+        T instance;
+        Class[] parameterTypes = longestConstructor.getParameterTypes();
+        Object[] parameters = new Object[parameterTypes.length];
+        for (int i = 0; i < parameterTypes.length; i++) {
+            Class parameterType = parameterTypes[i];
+            parameters[i] = resolve(parameterType);
+        }
+
+        instance = (T) longestConstructor.newInstance(parameters);
+        return instance;
     }
 
 }

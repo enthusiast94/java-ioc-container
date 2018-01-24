@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ContainerTest {
 
-    Container container;
+    private Container container;
 
     @BeforeEach
     void beforeEach() {
