@@ -2,6 +2,7 @@ package com.enthusiast94.ioc;
 
 import java.lang.reflect.Constructor;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
 public final class Container {
@@ -9,7 +10,7 @@ public final class Container {
     private final Map<String, Registration> typedRegistrations = new HashMap<>();
     private final Map<String, Object> resolvedSingletonInstances = new HashMap<>();
 
-    public synchronized  <F, T extends F> void registerType(Class<F> from, Class<T> to) {
+    public synchronized <F, T extends F> void registerType(Class<F> from, Class<T> to) {
         this.typedRegistrations.put(from.getName(), new Registration.TypeRegistration<>(from, to, false));
     }
 
@@ -23,7 +24,8 @@ public final class Container {
     }
 
     public synchronized <F> void registerInstance(F instance, String name) {
-        typedRegistrations.put(name, new Registration.NamedInstanceRegistration<>((Class<F>) instance.getClass(), name, instance));
+        typedRegistrations.put(name, new Registration.NamedInstanceRegistration<>((Class<F>) instance.getClass(),
+                name, instance));
     }
 
     public synchronized <T> T resolve(Class<T> typeToResolve) {
@@ -32,6 +34,7 @@ public final class Container {
 
     public synchronized <T> T resolve(String nameToResolve) {
         Registration registration = typedRegistrations.get(nameToResolve);
+
         if (registration == null) {
             throw new IocException("Failed to resolve " + nameToResolve);
         }
@@ -46,13 +49,7 @@ public final class Container {
                 }
 
                 if (instance == null) {
-                    Optional<Constructor> longestConstructor = getLongestConstructor(typeRegistration.to);
-
-                    if (!longestConstructor.isPresent()) {
-                        throw new IocException("No public constructors found for type: " + typeRegistration.to.getName());
-                    }
-
-                    instance = createInstance(longestConstructor.get());
+                    instance = createInstance(getInjectionConstructor(typeRegistration.to));
                 }
 
                 if (typeRegistration.isSingleton) {
@@ -72,13 +69,30 @@ public final class Container {
         }
     }
 
-    private Optional<Constructor> getLongestConstructor(Class type) {
-        return Arrays.stream(type.getDeclaredConstructors())
-                .max(Comparator.comparingInt(Constructor::getParameterCount));
+    private Constructor getInjectionConstructor(Class type) {
+        Constructor[] declaredConstructors = type.getDeclaredConstructors();
+        if (declaredConstructors.length == 0) {
+            throw new IocException("No public constructors found for type: " + type.getName());
+        }
+
+        List<Constructor> annotatedConstructors = Arrays.stream(declaredConstructors)
+                .filter(constructor -> constructor.getAnnotation(InjectionConstructor.class) != null)
+                .collect(Collectors.toList());
+
+        if (annotatedConstructors.isEmpty()) {
+            return Arrays.stream(declaredConstructors)
+                    .max(Comparator.comparingInt(Constructor::getParameterCount)).get();
+        }
+
+        if (annotatedConstructors.size() > 1) {
+            throw new IocException("At most one constructor can be annotated with @" +
+                    InjectionConstructor.class.getSimpleName());
+        }
+
+        return annotatedConstructors.get(0);
     }
 
     private <T> T createInstance(Constructor longestConstructor) throws InstantiationException, IllegalAccessException, java.lang.reflect.InvocationTargetException {
-        T instance;
         Class[] parameterTypes = longestConstructor.getParameterTypes();
         Object[] parameters = new Object[parameterTypes.length];
         for (int i = 0; i < parameterTypes.length; i++) {
@@ -86,8 +100,7 @@ public final class Container {
             parameters[i] = resolve(parameterType);
         }
 
-        instance = (T) longestConstructor.newInstance(parameters);
-        return instance;
+        return (T) longestConstructor.newInstance(parameters);
     }
 
 }
