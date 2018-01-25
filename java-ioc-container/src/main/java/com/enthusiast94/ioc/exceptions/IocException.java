@@ -1,10 +1,6 @@
-package com.enthusiast94.ioc;
+package com.enthusiast94.ioc.exceptions;
 
 public class IocException extends RuntimeException {
-
-    public IocException() {
-        super();
-    }
 
     public IocException(String message) {
         super(message);

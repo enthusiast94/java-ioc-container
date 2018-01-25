@@ -1,5 +1,6 @@
 package com.enthusiast94.ioc;
 
+import com.enthusiast94.ioc.exceptions.IocException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +65,7 @@ class ContainerTest {
     void shouldResolveRegisteredTypeWithNonEmptyConstructor() {
         container.registerType(ClassWithNonEmptyConstructor.class, ClassWithNonEmptyConstructor.class);
         container.registerType(TestConcreteClass.class, TestConcreteClass.class);
+        container.registerInstance(1, "blaParam");
         container.resolve(ClassWithNonEmptyConstructor.class);
     }
 }

@@ -1,8 +1,14 @@
 package com.enthusiast94.ioc;
 
+import com.enthusiast94.ioc.annotations.InjectionConstructor;
+import com.enthusiast94.ioc.annotations.InstanceName;
+import com.enthusiast94.ioc.exceptions.IocException;
 import com.google.common.annotations.VisibleForTesting;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,7 +60,6 @@ public final class Container {
         }
 
         if (registration instanceof Registration.TypeRegistration) {
-            try {
                 Registration.TypeRegistration typeRegistration = (Registration.TypeRegistration) registration;
                 T instance = null;
 
@@ -71,13 +76,12 @@ public final class Container {
                 }
 
                 return instance;
-            } catch (Exception e) {
-                throw new IocException(e);
-            }
         } else if (registration instanceof Registration.TypedInstanceRegistration) {
             return (T) ((Registration.TypedInstanceRegistration) registration).instance;
+
         } else if (registration instanceof Registration.NamedInstanceRegistration) {
             return (T) ((Registration.NamedInstanceRegistration) registration).instance;
+
         } else {
             throw new IocException("Cannot handle registrations of type: " + registration.getClass().getName());
         }
@@ -90,7 +94,7 @@ public final class Container {
         }
 
         List<Constructor> annotatedConstructors = Arrays.stream(declaredConstructors)
-                .filter(constructor -> constructor.getAnnotation(InjectionConstructor.class) != null)
+                .filter(constructor -> constructor.getDeclaredAnnotation(InjectionConstructor.class) != null)
                 .collect(Collectors.toList());
 
         if (annotatedConstructors.isEmpty()) {
@@ -106,15 +110,25 @@ public final class Container {
         return annotatedConstructors.get(0);
     }
 
-    private <T> T createInstance(Constructor longestConstructor) throws InstantiationException, IllegalAccessException, java.lang.reflect.InvocationTargetException {
-        Class[] parameterTypes = longestConstructor.getParameterTypes();
+    private <T> T createInstance(Constructor constructor) {
+
+        Parameter[] parameterTypes = constructor.getParameters();
         Object[] parameters = new Object[parameterTypes.length];
         for (int i = 0; i < parameterTypes.length; i++) {
-            Class parameterType = parameterTypes[i];
-            parameters[i] = resolve(parameterType);
+            Parameter parameter = parameterTypes[i];
+            InstanceName instanceNameAnnotation = parameter.getDeclaredAnnotation(InstanceName.class);
+            if (instanceNameAnnotation != null) {
+                parameters[i] = resolve(instanceNameAnnotation.value());
+            } else {
+                parameters[i] = resolve(parameter.getType());
+            }
         }
 
-        return (T) longestConstructor.newInstance(parameters);
+        try {
+            return (T) constructor.newInstance(parameters);
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            throw new IocException(e);
+        }
     }
 
 }
