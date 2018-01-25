@@ -15,7 +15,7 @@ class ContainerTest {
 
     @BeforeEach
     void beforeEach() {
-        container = new Container();
+        container = Container.getInstance();
     }
 
     @Test

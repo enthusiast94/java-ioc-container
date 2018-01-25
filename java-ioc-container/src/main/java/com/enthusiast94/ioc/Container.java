@@ -1,5 +1,7 @@
 package com.enthusiast94.ioc;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -7,8 +9,20 @@ import java.util.stream.Collectors;
 @SuppressWarnings("unchecked")
 public final class Container {
 
+    private static Container instance;
     private final Map<String, Registration> typedRegistrations = new HashMap<>();
     private final Map<String, Object> resolvedSingletonInstances = new HashMap<>();
+
+    @VisibleForTesting
+    Container() {}
+
+    public synchronized static Container getInstance() {
+        if (instance == null) {
+            instance = new Container();
+        }
+
+        return instance;
+    }
 
     public synchronized <F, T extends F> void registerType(Class<F> from, Class<T> to) {
         this.typedRegistrations.put(from.getName(), new Registration.TypeRegistration<>(from, to, false));
