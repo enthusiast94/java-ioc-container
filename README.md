@@ -1,6 +1,6 @@
 # java-ioc-container
 
-A .NET Unity style Inversion of Control (IoC) container for Java.
+An Inversion of Control (IoC) container for Java.
 
 ## How to use? 
 
