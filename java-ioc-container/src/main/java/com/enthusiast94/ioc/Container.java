@@ -5,11 +5,12 @@ import com.enthusiast94.ioc.annotations.InstanceName;
 import com.enthusiast94.ioc.exceptions.IocException;
 import com.google.common.annotations.VisibleForTesting;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Parameter;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
@@ -20,7 +21,7 @@ public final class Container {
     private final Map<String, Object> resolvedSingletonInstances = new HashMap<>();
 
     @VisibleForTesting
-    Container() {}
+    private Container() {}
 
     public synchronized static Container getInstance() {
         if (instance == null) {
@@ -53,14 +54,14 @@ public final class Container {
     }
 
     public synchronized <T> T resolve(String nameToResolve) {
-        Registration registration = typedRegistrations.get(nameToResolve);
+        var registration = typedRegistrations.get(nameToResolve);
 
         if (registration == null) {
             throw new IocException("Failed to resolve " + nameToResolve);
         }
 
         if (registration instanceof Registration.TypeRegistration) {
-                Registration.TypeRegistration typeRegistration = (Registration.TypeRegistration) registration;
+            var typeRegistration = (Registration.TypeRegistration) registration;
                 T instance = null;
 
                 if (typeRegistration.isSingleton) {
@@ -88,12 +89,12 @@ public final class Container {
     }
 
     private Constructor getInjectionConstructor(Class type) {
-        Constructor[] declaredConstructors = type.getDeclaredConstructors();
+        var declaredConstructors = type.getDeclaredConstructors();
         if (declaredConstructors.length == 0) {
             throw new IocException("No public constructors found for type: " + type.getName());
         }
 
-        List<Constructor> annotatedConstructors = Arrays.stream(declaredConstructors)
+        var annotatedConstructors = Arrays.stream(declaredConstructors)
                 .filter(constructor -> constructor.getDeclaredAnnotation(InjectionConstructor.class) != null)
                 .collect(Collectors.toList());
 
@@ -111,12 +112,11 @@ public final class Container {
     }
 
     private <T> T createInstance(Constructor constructor) {
-
-        Parameter[] parameterTypes = constructor.getParameters();
-        Object[] parameters = new Object[parameterTypes.length];
-        for (int i = 0; i < parameterTypes.length; i++) {
-            Parameter parameter = parameterTypes[i];
-            InstanceName instanceNameAnnotation = parameter.getDeclaredAnnotation(InstanceName.class);
+        var parameterTypes = constructor.getParameters();
+        var parameters = new Object[parameterTypes.length];
+        for (var i = 0; i < parameterTypes.length; i++) {
+            var parameter = parameterTypes[i];
+            var instanceNameAnnotation = parameter.getDeclaredAnnotation(InstanceName.class);
             if (instanceNameAnnotation != null) {
                 parameters[i] = resolve(instanceNameAnnotation.value());
             } else {
